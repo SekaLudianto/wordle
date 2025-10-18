@@ -16,7 +16,7 @@ const wss = new WebSocket.WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
 // TikTok LIVE credentials (hardcode)
-const tiktokUsername = '@boedak_soekaboemi';
+const tiktokUsername = '@achmadsyams';
 const sessionId = null;
 const ttTargetIdc = null;
 
