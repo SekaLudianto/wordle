@@ -70,7 +70,23 @@
 </head>
 <body class="bg-zinc-900 text-white flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden">
 
-    <div id="app" class="w-full max-w-lg mx-auto flex flex-col gap-6"> <!-- Sedikit lebih lebar untuk nama -->
+    <!-- Modal Koneksi TikTok -->
+    <div id="connect-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+        <div class="bg-zinc-800 rounded-2xl shadow-lg p-8 text-center max-w-sm w-full">
+            <h2 class="text-2xl font-bold mb-4">Hubungkan ke TikTok LIVE</h2>
+            <p class="text-zinc-400 mb-6 text-sm">Masukkan username TikTok yang sedang LIVE untuk memulai permainan.</p>
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">@</span>
+                <input type="text" id="tiktok-username-input" placeholder="namapengguna" class="w-full bg-zinc-700 border-2 border-zinc-600 rounded-lg py-3 pr-4 pl-8 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+            </div>
+            <button id="connect-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg mt-4 transition-colors duration-200 disabled:bg-zinc-600 disabled:cursor-not-allowed">
+                Hubungkan
+            </button>
+            <p id="connect-status" class="text-sm text-zinc-400 mt-4 h-5"></p>
+        </div>
+    </div>
+
+    <div id="app" class="w-full max-w-lg mx-auto flex flex-col gap-6 opacity-20 transition-opacity"> <!-- Mulai dengan transparan -->
         <!-- Header -->
         <header class="text-center">
             <h1 class="text-4xl font-black tracking-tighter">AHMAD WORDLE</h1>
@@ -147,7 +163,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- URL BACKEND ANDA DARI RENDER.COM ---
             // Ganti URL di bawah ini dengan URL backend Anda yang didapat dari Render.
-            const BACKEND_HOST = 'ahmad-wordle.onrender.com'; // <-- GANTI INI
+            const BACKEND_HOST = 'ahmad-wordle-server.onrender.com'; // <-- GANTI INI
+
+            const appEl = document.getElementById('app');
+            const connectModal = document.getElementById('connect-modal');
+            const usernameInput = document.getElementById('tiktok-username-input');
+            const connectBtn = document.getElementById('connect-btn');
+            const connectStatus = document.getElementById('connect-status');
 
             const gameBoard = document.getElementById('game-board');
             const timerEl = document.getElementById('timer');
@@ -172,6 +194,50 @@
             let currentGuesses = [];
             let nextGameInterval;
             let winCountTimeout;
+
+            // --- Logika untuk Modal Koneksi ---
+            connectBtn.addEventListener('click', async () => {
+                let username = usernameInput.value.trim();
+                if (!username) {
+                    connectStatus.textContent = 'Username tidak boleh kosong.';
+                    return;
+                }
+                
+                // Hapus @ jika ada
+                if (username.startsWith('@')) {
+                    username = username.substring(1);
+                }
+
+                connectStatus.textContent = 'Menghubungkan...';
+                connectBtn.disabled = true;
+
+                try {
+                    const response = await fetch(`https://${BACKEND_HOST}/api/connect-tiktok`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: `@${username}` })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Gagal terhubung.');
+                    }
+
+                    const result = await response.json();
+                    connectStatus.textContent = 'Berhasil terhubung!';
+                    
+                    setTimeout(() => {
+                        connectModal.classList.add('hidden');
+                        appEl.classList.remove('opacity-20');
+                        initializeGame(); // Mulai game setelah terhubung
+                    }, 1000);
+
+                } catch (error) {
+                    connectStatus.textContent = `Error: ${error.message} Pastikan user sedang LIVE.`;
+                    connectBtn.disabled = false;
+                }
+            });
+
 
             function initializeUI() {
                 gameBoard.innerHTML = '';
@@ -409,17 +475,19 @@
                     ws.close();
                 };
             }
-
-            initializeUI();
-            connectWebSocket();
             
-            fetch(`https://${BACKEND_HOST}/api/game-state`)
-                .then(res => res.json())
-                .then(data => {
-                    updateBoard(data.guesses || []);
-                    updateTimer(data.timeLeft || 600);
-                    updateBestGuess(data.bestGuess || null);
-                });
+            function initializeGame() {
+                initializeUI();
+                connectWebSocket();
+                
+                fetch(`https://${BACKEND_HOST}/api/game-state`)
+                    .then(res => res.json())
+                    .then(data => {
+                        updateBoard(data.guesses || []);
+                        updateTimer(data.timeLeft || 600);
+                        updateBestGuess(data.bestGuess || null);
+                    });
+            }
         });
     </script>
 </body>
