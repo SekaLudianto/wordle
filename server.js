@@ -20,7 +20,6 @@ const tiktokUsername = '@wiwit_r4'; // Username TikTok untuk game KATLA
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
-// --- BARU: Sajikan folder admin ---
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
 
@@ -57,7 +56,7 @@ let guesses = [];
 let currentRow = 0;
 let timeLeft = 600;
 let timerInterval;
-let leaderboard = {};
+let leaderboard = {}; // Struktur kembali ke { username: score }
 let bestGuess = null;
 
 // Endpoints
@@ -65,7 +64,7 @@ app.get('/api/new-game', (req, res) => {
     startNewGame();
     res.json({ status: 'New game started' });
 });
-app.get('/api/game-state', (req, res) => res.json({ guesses, currentRow, timeLeft, bestGuess })); // TargetWord dihapus dari sini
+app.get('/api/game-state', (req, res) => res.json({ guesses, currentRow, timeLeft, bestGuess }));
 app.get('/api/leaderboard', (req, res) => res.json(leaderboard));
 
 function validateWord(word) {
@@ -85,7 +84,6 @@ function startNewGame() {
     startTimer();
     console.log(`New game started, target word: ${targetWord}`);
     broadcastGameState();
-    // --- BARU: Kirim kata jawaban ke admin ---
     broadcastAdminUpdate();
 }
 
@@ -103,7 +101,6 @@ function broadcastAnswer(word, meaning) { broadcast({ type: 'answer', word, mean
 function broadcastWinner(word, meaning, nickname, winCount) { broadcast({ type: 'winner', word, meaning, nickname, winCount }); }
 function broadcastWinCount(username, nickname, winCount) { broadcast({ type: 'showWinCount', username, nickname, winCount }); }
 function broadcastLeaderboard() { broadcast({ type: 'leaderboardUpdate', leaderboard }); }
-// --- BARU: Fungsi broadcast untuk admin ---
 function broadcastAdminUpdate() { broadcast({ type: 'adminUpdate', targetWord }); }
 function broadcastRawComment(commentData) { broadcast({ type: 'rawComment', ...commentData }); }
 
@@ -126,7 +123,8 @@ function startTimer() {
     }, 1000);
 }
 
-async function processGuess(word, username, nickname, profilePictureUrl) {
+// profilePictureUrl dihapus dari parameter
+async function processGuess(word, username, nickname) {
     if (timeLeft <= 0 || !targetWord) return;
 
     const { valid, meaning } = validateWord(word);
@@ -141,7 +139,8 @@ async function processGuess(word, username, nickname, profilePictureUrl) {
         else if (targetWord.includes(word[i])) guessResult.push({ letter: word[i], status: 'yellow' });
         else guessResult.push({ letter: word[i], status: 'gray' });
     }
-    const guess = { word, result: guessResult, username, nickname, profilePictureUrl };
+    // profilePictureUrl dihapus dari objek tebakan
+    const guess = { word, result: guessResult, username, nickname };
     guesses.push(guess);
     currentRow++;
 
@@ -152,14 +151,10 @@ async function processGuess(word, username, nickname, profilePictureUrl) {
     broadcastGameState();
 
     if (word === targetWord) {
-        if (!leaderboard[username]) {
-            leaderboard[username] = { nickname: nickname, score: 0, profilePictureUrl: profilePictureUrl };
-        }
-        leaderboard[username].score += 1;
-        leaderboard[username].nickname = nickname;
-        leaderboard[username].profilePictureUrl = profilePictureUrl;
+        // Logika leaderboard disederhanakan
+        leaderboard[nickname] = (leaderboard[nickname] || 0) + 1;
         
-        broadcastWinner(word, meaning, nickname, leaderboard[username].score);
+        broadcastWinner(word, meaning, nickname, leaderboard[nickname]);
         broadcastLeaderboard();
 
         timeLeft = 0;
@@ -169,19 +164,17 @@ async function processGuess(word, username, nickname, profilePictureUrl) {
     }
 }
 
-// --- BARU: Tambah listener untuk pesan dari client ---
 wss.on('connection', ws => {
     ws.on('message', message => {
         try {
             const data = JSON.parse(message);
             if (data.type === 'adminGuess' && data.word) {
                 console.log(`Admin guess received: ${data.word}`);
-                // Proses tebakan admin dengan profil dummy
+                // profilePictureUrl dihapus dari panggilan
                 processGuess(
                     data.word.toLowerCase(),
                     'admin_host',
-                    'HOST',
-                    'https://p16-sign-va.tiktokcdn.com/tos-maliva-avt-0068/7075526831652339717~c5_720x720.jpeg' // URL foto profil admin
+                    'HOST'
                 );
             }
         } catch (e) {
@@ -207,20 +200,21 @@ tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     const rawComment = data.comment.trim();
     const username = data.user.uniqueId;
     const nickname = data.user.nickname || username;
-    const profilePictureUrl = data.user.profilePictureUrl;
+    // profilePictureUrl tidak lagi diambil
     
-    // --- BARU: Siarkan semua komentar ke admin ---
-    broadcastRawComment({ nickname, comment: rawComment, profilePictureUrl });
+    // profilePictureUrl dihapus dari broadcast
+    broadcastRawComment({ nickname, comment: rawComment });
 
     const commentForGame = rawComment.toLowerCase();
     if (commentForGame === '!win') {
-        const playerData = leaderboard[username] || { score: 0 };
-        broadcastWinCount(username, nickname, playerData.score);
+        const winCount = leaderboard[nickname] || 0;
+        broadcastWinCount(username, nickname, winCount);
         return;
     }
 
     const comment = commentForGame.replace(/[^a-z]/g, '').slice(0, 5);
-    if (comment.length === 5) await processGuess(comment, username, nickname, profilePictureUrl);
+    // profilePictureUrl dihapus dari panggilan
+    if (comment.length === 5) await processGuess(comment, username, nickname);
 });
 
 tiktokConnection.on('error', (err) => console.error('TikTok connection error:', JSON.stringify(err, null, 2)));
