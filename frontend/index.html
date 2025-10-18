@@ -12,49 +12,65 @@
         body { font-family: 'Inter', sans-serif; touch-action: manipulation; }
         @keyframes flip { 0% { transform: rotateX(0deg); } 45% { transform: rotateX(90deg); } 55% { transform: rotateX(90deg); } 100% { transform: rotateX(0deg); } }
         .tile-flip { animation: flip 0.6s ease-in-out; }
-        .tile { display: inline-flex; justify-content: center; align-items: center; font-size: 2rem; font-weight: bold; line-height: 1; text-transform: uppercase; border: 2px solid #3f3f46; transition: background-color 0.3s, border-color 0.3s; }
+        .tile {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.75rem; /* Ukuran font tile diperkecil */
+            font-weight: bold;
+            line-height: 1;
+            text-transform: uppercase;
+            border: 2px solid #e2e8f0; /* slate-200 */
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+        }
         @keyframes toastIn { from { transform: translateY(150%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
         .toast-animation { animation: toastIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards, fadeOut 0.5s 4.5s forwards; }
     </style>
 </head>
-<body class="bg-zinc-900 text-white flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden">
+<body class="bg-slate-50 text-slate-800 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 overflow-hidden">
 
-    <div id="app" class="w-full max-w-lg mx-auto flex flex-col gap-6">
+    <div id="app" class="w-full max-w-sm mx-auto flex flex-col gap-4">
         <!-- Header -->
         <header class="text-center">
-            <h1 class="text-4xl font-black tracking-tighter">AHMAD WORDLE</h1>
-            <p class="text-zinc-400 flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-tiktok" viewBox="0 0 16 16"><path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3> 0 1 0 3 3V0Z"/></svg>
+            <h1 class="text-4xl font-black tracking-tighter text-slate-800">AHMAD WORDLE</h1>
+            <p class="text-slate-400 flex items-center justify-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-tiktok" viewBox="0 0 16 16"><path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3> 0 1 0 3 3V0Z"/></svg>
                 <span>LIVE TIKTOK GAME</span>
             </p>
         </header>
 
         <!-- UI -->
-        <div class="grid grid-cols-2 gap-4 text-center">
-            <div class="bg-zinc-800 p-4 rounded-lg flex flex-col justify-center"><div id="timer" class="text-3xl font-bold text-cyan-400">10:00</div><div class="text-xs text-zinc-400">SISA WAKTU</div></div>
-            <div class="bg-zinc-800 p-4 rounded-lg flex flex-col justify-center"><div id="best-guess-display" class="grid grid-cols-5 gap-1.5 mx-auto h-[40px]" style="width: calc(40px * 5 + 4 * 0.375rem);"></div><div id="best-guess-user" class="text-xs text-zinc-400 truncate h-[16px] mt-2">TEBAKAN TERBAIK</div></div>
+        <div class="grid grid-cols-2 gap-3 text-center">
+            <div class="bg-white p-3 rounded-xl shadow-sm flex flex-col justify-center"><div id="timer" class="text-3xl font-bold text-sky-500">10:00</div><div class="text-xs text-slate-400">SISA WAKTU</div></div>
+            <div class="bg-white p-3 rounded-xl shadow-sm flex flex-col justify-center"><div id="best-guess-display" class="grid grid-cols-5 gap-1 mx-auto h-[36px]" style="width: calc(36px * 5 + 4 * 0.25rem);"></div><div id="best-guess-user" class="text-xs text-slate-400 truncate h-[16px] mt-2">TEBAKAN TERBAIK</div></div>
         </div>
-        <div id="toast-container" class="h-12 flex flex-col-reverse items-center gap-2 overflow-hidden"></div>
-        <div id="game-board" class="flex flex-col gap-2 w-full"></div>
-        <div class="text-center text-zinc-500 text-sm p-4 border border-zinc-700 rounded-lg mt-4">Ketik kata 5 huruf di kolom komentar TikTok Live untuk menebak!</div>
+        <!-- PERUBAHAN: Tinggi container diubah dari h-10 menjadi h-8 -->
+        <div id="toast-container" class="h-8 flex flex-col-reverse items-center gap-2 overflow-hidden"></div>
+        <div id="game-board" class="flex flex-col gap-1.5 w-full"></div>
+        <div class="text-center text-slate-400 text-xs p-3 border border-slate-200 rounded-lg mt-2">Ketik kata 5 huruf di kolom komentar TikTok Live untuk menebak!</div>
     </div>
 
     <!-- Modals -->
-    <div id="answer-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
-        <div class="bg-zinc-800 rounded-2xl shadow-lg p-8 text-center max-w-sm w-full transform transition-all scale-95 opacity-0" id="answer-modal-content">
-            <h2 id="modal-title" class="text-2xl font-bold mb-2">Waktu Habis!</h2>
-            <div id="winner-info" class="hidden"><p class="text-lg text-zinc-300">dimenangkan oleh</p><p id="winner-nickname" class="text-3xl font-bold text-amber-400 my-2"></p><p class="text-zinc-400 mb-4">Total Kemenangan: <span id="winner-win-count" class="font-bold text-white">0</span>x</p><hr class="border-zinc-600 my-4"></div>
-            <p class="text-zinc-400 mb-4">Kata yang benar adalah:</p><div id="correct-word" class="text-4xl font-black uppercase tracking-widest text-green-400 mb-4"></div><p id="word-meaning" class="text-zinc-300 bg-zinc-700 p-3 rounded-md text-sm"></p><p id="next-game-timer" class="text-sm text-zinc-400 mt-6">Game baru akan dimulai sebentar lagi...</p>
+    <div id="answer-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-lg p-6 text-center max-w-xs w-full transform transition-all scale-95 opacity-0" id="answer-modal-content">
+            <h2 id="modal-title" class="text-xl font-bold mb-2 text-slate-800">Waktu Habis!</h2>
+            <div id="winner-info" class="hidden"><p class="text-sm text-slate-500">dimenangkan oleh</p><p id="winner-nickname" class="text-2xl font-bold text-amber-500 my-1"></p><p class="text-slate-500 mb-3 text-sm">Total Kemenangan: <span id="winner-win-count" class="font-bold text-slate-700">0</span>x</p><hr class="border-slate-200 my-3"></div>
+            <p class="text-slate-500 mb-2 text-sm">Kata yang benar adalah:</p><div id="correct-word" class="text-4xl font-black uppercase tracking-widest text-green-500 mb-3"></div><p id="word-meaning" class="text-slate-600 bg-slate-100 p-3 rounded-md text-xs"></p><p id="next-game-timer" class="text-xs text-slate-400 mt-5">Game baru akan dimulai sebentar lagi...</p>
         </div>
     </div>
-    <div id="win-count-modal" class="fixed top-10 left-1/2 -translate-x-1/2 bg-zinc-800 border-2 border-amber-400 rounded-2xl shadow-lg p-6 text-center max-w-sm w-full z-40 transition-all transform scale-95 opacity-0 hidden">
-        <p class="text-lg text-zinc-300"><span id="win-count-nickname" class="font-bold text-white text-xl"></span></p><p class="text-zinc-400 mt-1">telah memenangkan permainan sebanyak</p><p class="text-6xl font-black text-amber-400 my-2"><span id="win-count-number">0</span>x</p>
+    <div id="win-count-modal" class="fixed top-5 left-1/2 -translate-x-1/2 bg-white border-2 border-amber-400 rounded-2xl shadow-lg p-4 text-center max-w-xs w-full z-40 transition-all transform scale-95 opacity-0 hidden">
+        <p class="text-base text-slate-600">
+            <span id="win-count-nickname" class="font-bold text-slate-800 text-lg"></span>
+        </p>
+        <p class="text-slate-500 mt-1 text-sm">telah memenangkan permainan sebanyak</p>
+        <p class="text-5xl font-black text-amber-400 my-1">
+            <span id="win-count-number">0</span>x
+        </p>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- BACKEND HOST DIUBAH ---
             const BACKEND_HOST = 'ahmad-wordle.onrender.com';
 
             const gameBoard = document.getElementById('game-board');
@@ -78,21 +94,23 @@
             const COLS = 5;
             let currentGuesses = [];
             let nextGameInterval;
+            let winCountTimeout;
 
             function initializeUI() {
                 gameBoard.innerHTML = '';
                 for (let i = 0; i < ROWS; i++) {
                     const rowWrapper = document.createElement('div');
-                    rowWrapper.className = 'flex items-center gap-3';
+                    rowWrapper.className = 'flex items-center gap-2';
                     const tileContainer = document.createElement('div');
-                    tileContainer.className = 'grid grid-cols-5 gap-1.5 flex-grow';
+                    tileContainer.className = 'grid grid-cols-5 gap-1 flex-grow';
                     for (let j = 0; j < COLS; j++) {
                         const tile = document.createElement('div');
-                        tile.className = 'tile w-full aspect-square rounded-md';
+                        tile.className = 'tile w-full aspect-square rounded-md bg-white';
                         tileContainer.appendChild(tile);
                     }
                     const nicknameEl = document.createElement('div');
-                    nicknameEl.className = 'w-28 text-base font-semibold text-zinc-200 text-left truncate nickname-display opacity-0 transition-opacity duration-300';
+                    // --- PERUBAHAN: Menghapus 'truncate' dan menambahkan 'break-words' ---
+                    nicknameEl.className = 'w-24 text-sm font-medium text-slate-500 text-left break-words nickname-display opacity-0 transition-opacity duration-300';
                     nicknameEl.style.lineHeight = '1.2';
                     rowWrapper.appendChild(tileContainer);
                     rowWrapper.appendChild(nicknameEl);
@@ -117,7 +135,11 @@
                             tile.textContent = letterData.letter;
                             setTimeout(() => {
                                 tile.classList.add('tile-flip');
-                                const statusColor = { green: 'bg-green-600 border-green-600', yellow: 'bg-amber-500 border-amber-500', gray: 'bg-zinc-700 border-zinc-700' }[letterData.status] || 'bg-transparent';
+                                const statusColor = { 
+                                    green: 'bg-green-500 border-green-500 text-white', 
+                                    yellow: 'bg-amber-500 border-amber-500 text-white', 
+                                    gray: 'bg-slate-400 border-slate-400 text-white' 
+                                }[letterData.status] || 'bg-white';
                                 tile.className = `tile w-full aspect-square rounded-md ${statusColor}`;
                                 tile.textContent = letterData.letter;
                             }, tileIndex * 100);
@@ -127,7 +149,7 @@
                         nicknameEl.classList.add('opacity-0');
                         tiles.forEach(tile => {
                             tile.textContent = '';
-                            tile.className = 'tile w-full aspect-square rounded-md';
+                            tile.className = 'tile w-full aspect-square rounded-md bg-white';
                         });
                     }
                 });
@@ -144,8 +166,12 @@
                 if (bestGuess && bestGuess.result) {
                     bestGuess.result.forEach(letterData => {
                         const tile = document.createElement('div');
-                        const statusColor = { green: 'bg-green-600 border-green-600', yellow: 'bg-amber-500 border-amber-500', gray: 'bg-zinc-700 border-zinc-700' }[letterData.status] || 'bg-transparent border-zinc-700';
-                        tile.className = `w-full h-full rounded-md flex items-center justify-center text-xl font-bold uppercase ${statusColor}`;
+                        const statusColor = { 
+                            green: 'bg-green-500 border-green-500 text-white', 
+                            yellow: 'bg-amber-500 border-amber-500 text-white', 
+                            gray: 'bg-slate-400 border-slate-400 text-white' 
+                        }[letterData.status] || 'bg-white border-slate-200';
+                        tile.className = `w-full h-full rounded-md flex items-center justify-center text-lg font-bold uppercase ${statusColor}`;
                         tile.textContent = letterData.letter;
                         bestGuessDisplay.appendChild(tile);
                     });
@@ -153,7 +179,7 @@
                 } else {
                     for (let i = 0; i < 5; i++) {
                         const tile = document.createElement('div');
-                        tile.className = 'w-full h-full rounded-md border-2 border-zinc-700';
+                        tile.className = 'w-full h-full rounded-md border-2 border-slate-200 bg-white';
                         bestGuessDisplay.appendChild(tile);
                     }
                     bestGuessUserEl.textContent = 'TEBAKAN TERBAIK';
@@ -163,7 +189,7 @@
             function showToast(message) {
                 while (toastContainer.firstChild) { toastContainer.removeChild(toastContainer.firstChild); }
                 const toast = document.createElement('div');
-                toast.className = 'bg-zinc-700 text-white text-sm py-2 px-4 rounded-lg shadow-md toast-animation max-w-full truncate';
+                toast.className = 'bg-slate-800 text-white text-xs py-2 px-4 rounded-full shadow-lg toast-animation max-w-full truncate';
                 toast.textContent = message;
                 toastContainer.appendChild(toast);
                 setTimeout(() => { if(toast.parentElement) { toast.parentElement.removeChild(toast); } }, 5000);
@@ -186,11 +212,11 @@
                 setTimeout(() => answerModalContent.classList.remove('scale-95', 'opacity-0'), 10);
                 let countdown = 15;
                 const nextGameTimerEl = document.getElementById('next-game-timer');
-                nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-white">${countdown}</span> detik...`;
+                nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-slate-700">${countdown}</span> detik...`;
                 nextGameInterval = setInterval(() => {
                     countdown--;
                     if (countdown > 0) {
-                        nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-white">${countdown}</span> detik...`;
+                        nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-slate-700">${countdown}</span> detik...`;
                     } else {
                         clearInterval(nextGameInterval);
                         nextGameTimerEl.textContent = 'Memulai game baru...';
