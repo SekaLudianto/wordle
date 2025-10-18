@@ -13,15 +13,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = createServer(app);
 const wss = new WebSocket.WebSocketServer({ server });
-const PORT = process.env.PORT || 3000; // Siap menerima port dari Render
+const PORT = process.env.PORT || 3000;
+
+// --- KEMBALIKAN USERNAME TIKTOK DI SINI ---
+const tiktokUsername = '@achmadsyams'; // Ganti dengan username yang akan LIVE
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
-// --- PERHATIAN: HANYA UNTUK DEVELOPMENT LOKAL ---
-// Baris di bawah ini akan diservis oleh Netlify saat sudah di-deploy.
-// Jadi, tidak apa-apa jika ini tidak berfungsi sempurna di Render.
-app.use(express.static(path.join(__dirname, 'frontend'))); 
+app.use(express.static(path.join(__dirname, 'frontend')));
 
 // Load KBBI JSON
 let kbbiData = [];
@@ -59,89 +58,19 @@ let timeLeft = 600; // 10 menit
 let timerInterval;
 let leaderboard = {};
 let bestGuess = null;
-let currentConnection = null; // --- BARU: Untuk menyimpan koneksi TikTok saat ini
 
-// --- ENDPOINT BARU UNTUK KONEKSI TIKTOK ---
-app.post('/api/connect-tiktok', async (req, res) => {
-    const { username } = req.body;
-
-    if (!username) {
-        return res.status(400).json({ message: 'Username is required' });
-    }
-
-    if (currentConnection) {
-        try {
-            currentConnection.disconnect();
-            console.log('Disconnected from previous session.');
-        } catch (err) {
-            console.error('Error disconnecting previous session:', err);
-        }
-    }
-    
-    console.log(`Attempting to connect to TikTok LIVE: ${username}`);
-    
-    const tiktokConnection = new TikTokLiveConnection(username, {
-        processInitialData: false,
-        fetchRoomInfoOnConnect: true,
-        enableLog: true,
-        clientParams: {
-            "app_language": "id-ID", // Menggunakan bahasa Indonesia
-            "device_platform": "web"
-        },
-        requestHeaders: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"
-        }
-    });
-
-    tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
-        const rawComment = data.comment.trim().toLowerCase();
-        const user = data.user.uniqueId;
-        const nickname = data.user.nickname || user;
-        
-        // Cek command !win
-        if (rawComment === '!win') {
-            const winCount = leaderboard[user] || 0;
-            broadcastWinCount(user, nickname, winCount);
-            return;
-        }
-
-        const comment = rawComment.replace(/[^a-z]/g, '').slice(0, 5);
-        if (comment.length === 5) {
-            await processGuess(comment, user, nickname);
-        }
-    });
-
-    tiktokConnection.on('error', (err) => {
-        console.error('TikTok connection error:', JSON.stringify(err, null, 2));
-    });
-
-    tiktokConnection.on('disconnected', () => {
-        console.log('TikTok WebSocket disconnected.');
-        broadcastMessage('Koneksi ke TikTok LIVE terputus.');
-    });
-
-    try {
-        const state = await tiktokConnection.connect();
-        currentConnection = tiktokConnection;
-        console.log(`Connected to TikTok LIVE: ${state.roomId}`);
-        
-        // Mulai game baru setelah berhasil terhubung
-        startNewGame();
-        broadcastMessage(`Terhubung ke LIVE ${username}! Permainan dimulai.`);
-        
-        res.json({ message: `Successfully connected to ${username}` });
-    } catch (err) {
-        console.error('Failed to connect to TikTok LIVE:', err.message);
-        res.status(500).json({ message: err.message || 'Failed to connect. Is the user live?' });
-    }
-});
-
-
-// Endpoint untuk start game baru (bisa dipanggil jika perlu)
+// Endpoint (Endpoint koneksi dihapus)
 app.get('/api/new-game', (req, res) => {
     startNewGame();
     res.json({ status: 'New game started' });
-    broadcastGameState();
+});
+
+app.get('/api/game-state', (req, res) => {
+    res.json({ guesses, currentRow, timeLeft, targetWord, bestGuess });
+});
+
+app.get('/api/leaderboard', (req, res) => {
+    res.json(leaderboard);
 });
 
 function startNewGame() {
@@ -153,46 +82,108 @@ function startNewGame() {
     clearInterval(timerInterval);
     startTimer();
     console.log(`New game started, target word: ${targetWord}`);
+    broadcastGameState();
 }
 
-app.get('/api/validate-word/:word', (req, res) => {
-    // ... (fungsi ini tetap sama)
-});
+// ... (Fungsi-fungsi lain seperti broadcastGameState, startTimer, processGuess tetap sama)
 
-app.get('/api/game-state', (req, res) => {
-    res.json({ guesses, currentRow, timeLeft, targetWord, bestGuess });
-});
-
-app.get('/api/leaderboard', (req, res) => {
-    res.json(leaderboard);
-});
-
-// Broadcast functions (tetap sama)
-function broadcastGameState() { /* ... */ }
-function broadcastMessage(message) { /* ... */ }
-function broadcastAnswer(word, meaning) { /* ... */ }
-function broadcastWinner(word, meaning, nickname, winCount) { /* ... */ }
-function broadcastWinCount(username, nickname, winCount) { /* ... */ }
-
+// Fungsi broadcast
+function broadcastGameState() { /* ... kode tidak berubah ... */ }
+function broadcastMessage(message) { /* ... kode tidak berubah ... */ }
+function broadcastAnswer(word, meaning) { /* ... kode tidak berubah ... */ }
+function broadcastWinner(word, meaning, nickname, winCount) { /* ... kode tidak berubah ... */ }
+function broadcastWinCount(username, nickname, winCount) { /* ... kode tidak berubah ... */ }
 
 function startTimer() {
-    // ... (fungsi ini tetap sama, pastikan timeLeft = 600)
-}
-
-function calculateGuessScore(guess) {
-    // ... (fungsi ini tetap sama)
+    clearInterval(timerInterval);
+    timeLeft = 600;
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        broadcastGameState();
+        if (timeLeft <= 0 && targetWord) {
+            clearInterval(timerInterval);
+            const entry = kbbiMap.get(targetWord.toLowerCase());
+            const meaning = entry ? `${entry.makna} (${entry.contoh || 'Tanpa contoh'})` : 'Makna tidak ditemukan';
+            broadcastAnswer(targetWord, meaning);
+            console.log(`Time up! Answer: ${targetWord}`);
+            targetWord = '';
+            setTimeout(startNewGame, 15000); // 15 detik jeda
+        }
+    }, 1000);
 }
 
 async function processGuess(word, username, nickname) {
-    // ... (fungsi ini tetap sama, pastikan setTimeout jeda adalah 15000)
+    // ... (kode processGuess tidak berubah, pastikan ada logika !win di dalamnya)
+    if (word === '!win') {
+        const winCount = leaderboard[username] || 0;
+        broadcastWinCount(username, nickname, winCount);
+        return;
+    }
+
+    if (timeLeft <= 0 || !targetWord) return;
+
+    const res = await fetch(`http://localhost:${PORT}/api/validate-word/${word}`); // ini perlu disesuaikan jika deploy
+    const { valid, meaning } = await res.json();
+    if (!valid) return;
+
+    // ... (sisa logika processGuess)
+    if (word === targetWord) {
+        leaderboard[username] = (leaderboard[username] || 0) + 1;
+        broadcastWinner(word, meaning, nickname, leaderboard[username]);
+        timeLeft = 0;
+        clearInterval(timerInterval);
+        targetWord = '';
+        setTimeout(startNewGame, 15000); // 15 detik jeda
+    }
 }
 
 
-// --- KODE KONEKSI OTOMATIS DIHAPUS DARI SINI ---
+// --- KEMBALIKAN KONEKSI OTOMATIS TIKTOK ---
+const tiktokConnection = new TikTokLiveConnection(tiktokUsername, {
+    processInitialData: false,
+    fetchRoomInfoOnConnect: true,
+    enableLog: true
+});
 
+tiktokConnection.connect().then(state => {
+    console.info(`Connected to TikTok LIVE: ${state.roomId}`);
+    broadcastMessage(`Terhubung ke LIVE ${tiktokUsername}! Permainan dimulai.`);
+    // Mulai game pertama setelah berhasil terhubung
+    startNewGame();
+}).catch(err => {
+    console.error('Failed to connect to TikTok LIVE:', err.message);
+    console.error('PASTIKAN PENGGUNA SEDANG LIVE SAAT SERVER DINYALAKAN.');
+});
+
+tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
+    const rawComment = data.comment.trim().toLowerCase();
+    const username = data.user.uniqueId;
+    const nickname = data.user.nickname || username;
+
+    if (rawComment === '!win') {
+        const winCount = leaderboard[username] || 0;
+        broadcastWinCount(username, nickname, winCount);
+        return;
+    }
+
+    const comment = rawComment.replace(/[^a-z]/g, '').slice(0, 5);
+    if (comment.length === 5) {
+        await processGuess(comment, username, nickname);
+    }
+});
+
+tiktokConnection.on('error', (err) => {
+    console.error('TikTok connection error:', JSON.stringify(err, null, 2));
+});
+
+tiktokConnection.on('disconnected', () => {
+    console.log('TikTok WebSocket disconnected.');
+    broadcastMessage('Koneksi ke TikTok LIVE terputus.');
+});
 
 // Start server
 server.listen(PORT, () => {
     console.log(`Server + WebSocket running on port ${PORT}`);
-    // Server sekarang hanya menyala dan menunggu perintah dari frontend.
+    console.log(`Attempting to connect to ${tiktokUsername}. Make sure they are LIVE.`);
 });
+
