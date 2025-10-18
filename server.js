@@ -15,7 +15,7 @@ const server = createServer(app);
 const wss = new WebSocket.WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const tiktokUsername = '@wiwit_r4'; // Username TikTok untuk game KATLA
+const tiktokUsername = '@achmadsyams'; // Username TikTok untuk game KATLA
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
@@ -56,7 +56,7 @@ let guesses = [];
 let currentRow = 0;
 let timeLeft = 600;
 let timerInterval;
-let leaderboard = {}; // Struktur kembali ke { username: score }
+let leaderboard = {};
 let bestGuess = null;
 
 // Endpoints
@@ -123,7 +123,6 @@ function startTimer() {
     }, 1000);
 }
 
-// profilePictureUrl dihapus dari parameter
 async function processGuess(word, username, nickname) {
     if (timeLeft <= 0 || !targetWord) return;
 
@@ -139,7 +138,6 @@ async function processGuess(word, username, nickname) {
         else if (targetWord.includes(word[i])) guessResult.push({ letter: word[i], status: 'yellow' });
         else guessResult.push({ letter: word[i], status: 'gray' });
     }
-    // profilePictureUrl dihapus dari objek tebakan
     const guess = { word, result: guessResult, username, nickname };
     guesses.push(guess);
     currentRow++;
@@ -151,7 +149,6 @@ async function processGuess(word, username, nickname) {
     broadcastGameState();
 
     if (word === targetWord) {
-        // Logika leaderboard disederhanakan
         leaderboard[nickname] = (leaderboard[nickname] || 0) + 1;
         
         broadcastWinner(word, meaning, nickname, leaderboard[nickname]);
@@ -165,12 +162,16 @@ async function processGuess(word, username, nickname) {
 }
 
 wss.on('connection', ws => {
+    // --- PERBAIKAN: Kirim status admin saat ini ke koneksi baru ---
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'adminUpdate', targetWord }));
+    }
+
     ws.on('message', message => {
         try {
             const data = JSON.parse(message);
             if (data.type === 'adminGuess' && data.word) {
                 console.log(`Admin guess received: ${data.word}`);
-                // profilePictureUrl dihapus dari panggilan
                 processGuess(
                     data.word.toLowerCase(),
                     'admin_host',
@@ -200,9 +201,7 @@ tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     const rawComment = data.comment.trim();
     const username = data.user.uniqueId;
     const nickname = data.user.nickname || username;
-    // profilePictureUrl tidak lagi diambil
     
-    // profilePictureUrl dihapus dari broadcast
     broadcastRawComment({ nickname, comment: rawComment });
 
     const commentForGame = rawComment.toLowerCase();
@@ -213,7 +212,6 @@ tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     }
 
     const comment = commentForGame.replace(/[^a-z]/g, '').slice(0, 5);
-    // profilePictureUrl dihapus dari panggilan
     if (comment.length === 5) await processGuess(comment, username, nickname);
 });
 

@@ -75,10 +75,6 @@
                             const commentEl = document.createElement('div');
                             commentEl.className = 'flex items-start gap-2 text-sm';
                             
-                            const img = document.createElement('img');
-                            img.src = data.profilePictureUrl;
-                            img.className = 'w-8 h-8 rounded-full bg-slate-200';
-
                             const contentWrapper = document.createElement('div');
                             const nickname = document.createElement('p');
                             nickname.className = 'font-bold text-slate-800';
@@ -90,11 +86,9 @@
 
                             contentWrapper.appendChild(nickname);
                             contentWrapper.appendChild(commentText);
-                            commentEl.appendChild(img);
                             commentEl.appendChild(contentWrapper);
                             
                             commentFeed.appendChild(commentEl);
-                            // Auto-scroll to bottom
                             commentFeed.scrollTop = commentFeed.scrollHeight;
                             break;
                     }
@@ -125,3 +119,4 @@
     </script>
 </body>
 </html>
+
