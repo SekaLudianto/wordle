@@ -98,12 +98,42 @@ function startNewGame() {
     broadcastGameState();
 }
 
-// Fungsi broadcast (tidak berubah)
-function broadcastGameState() { /* ... */ }
-function broadcastMessage(message) { /* ... */ }
-function broadcastAnswer(word, meaning) { /* ... */ }
-function broadcastWinner(word, meaning, nickname, winCount) { /* ... */ }
-function broadcastWinCount(username, nickname, winCount) { /* ... */ }
+// --- FUNGSI BROADCAST DIPERBAIKI ---
+function broadcastGameState() {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'gameState', guesses, currentRow, timeLeft, bestGuess }));
+        }
+    });
+}
+function broadcastMessage(message) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'message', content: message }));
+        }
+    });
+}
+function broadcastAnswer(word, meaning) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'answer', word, meaning }));
+        }
+    });
+}
+function broadcastWinner(word, meaning, nickname, winCount) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'winner', word, meaning, nickname, winCount }));
+        }
+    });
+}
+function broadcastWinCount(username, nickname, winCount) {
+     wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'showWinCount', username, nickname, winCount }));
+        }
+    });
+}
 
 
 function startTimer() {

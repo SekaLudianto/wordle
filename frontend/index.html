@@ -20,8 +20,6 @@
 </head>
 <body class="bg-zinc-900 text-white flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden">
 
-    <!-- Modal Koneksi TikTok Dihapus -->
-
     <div id="app" class="w-full max-w-lg mx-auto flex flex-col gap-6">
         <!-- Header -->
         <header class="text-center">
@@ -32,7 +30,7 @@
             </p>
         </header>
 
-        <!-- Sisa dari UI (Timer, Papan, dll) tidak berubah -->
+        <!-- UI -->
         <div class="grid grid-cols-2 gap-4 text-center">
             <div class="bg-zinc-800 p-4 rounded-lg flex flex-col justify-center"><div id="timer" class="text-3xl font-bold text-cyan-400">10:00</div><div class="text-xs text-zinc-400">SISA WAKTU</div></div>
             <div class="bg-zinc-800 p-4 rounded-lg flex flex-col justify-center"><div id="best-guess-display" class="grid grid-cols-5 gap-1.5 mx-auto h-[40px]" style="width: calc(40px * 5 + 4 * 0.375rem);"></div><div id="best-guess-user" class="text-xs text-zinc-400 truncate h-[16px] mt-2">TEBAKAN TERBAIK</div></div>
@@ -42,7 +40,7 @@
         <div class="text-center text-zinc-500 text-sm p-4 border border-zinc-700 rounded-lg mt-4">Ketik kata 5 huruf di kolom komentar TikTok Live untuk menebak!</div>
     </div>
 
-    <!-- Semua modal (jawaban, win count) tidak berubah -->
+    <!-- Modals -->
     <div id="answer-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-zinc-800 rounded-2xl shadow-lg p-8 text-center max-w-sm w-full transform transition-all scale-95 opacity-0" id="answer-modal-content">
             <h2 id="modal-title" class="text-2xl font-bold mb-2">Waktu Habis!</h2>
@@ -56,30 +54,198 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const BACKEND_HOST = 'ahmad-wordle.onrender.com'; // Ganti ini jika perlu
-            
-            // Variabel UI tetap sama, kecuali yang berhubungan dengan modal koneksi
+            // --- BACKEND HOST DIUBAH ---
+            const BACKEND_HOST = 'ahmad-wordle.onrender.com';
+
             const gameBoard = document.getElementById('game-board');
-            // ... (deklarasi variabel lainnya)
+            const timerEl = document.getElementById('timer');
+            const bestGuessDisplay = document.getElementById('best-guess-display');
+            const bestGuessUserEl = document.getElementById('best-guess-user');
+            const answerModal = document.getElementById('answer-modal');
+            const answerModalContent = document.getElementById('answer-modal-content');
+            const modalTitleEl = document.getElementById('modal-title');
+            const correctWordEl = document.getElementById('correct-word');
+            const wordMeaningEl = document.getElementById('word-meaning');
+            const toastContainer = document.getElementById('toast-container');
+            const winCountModal = document.getElementById('win-count-modal');
+            const winCountNicknameEl = document.getElementById('win-count-nickname');
+            const winCountNumberEl = document.getElementById('win-count-number');
+            const winnerInfoEl = document.getElementById('winner-info');
+            const winnerNicknameEl = document.getElementById('winner-nickname');
+            const winnerWinCountEl = document.getElementById('winner-win-count');
 
-            // --- Logika Modal Koneksi Dihapus ---
+            const ROWS = 6;
+            const COLS = 5;
+            let currentGuesses = [];
+            let nextGameInterval;
 
-            // Semua fungsi UI (initializeUI, updateBoard, dll) tidak berubah
+            function initializeUI() {
+                gameBoard.innerHTML = '';
+                for (let i = 0; i < ROWS; i++) {
+                    const rowWrapper = document.createElement('div');
+                    rowWrapper.className = 'flex items-center gap-3';
+                    const tileContainer = document.createElement('div');
+                    tileContainer.className = 'grid grid-cols-5 gap-1.5 flex-grow';
+                    for (let j = 0; j < COLS; j++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'tile w-full aspect-square rounded-md';
+                        tileContainer.appendChild(tile);
+                    }
+                    const nicknameEl = document.createElement('div');
+                    nicknameEl.className = 'w-28 text-base font-semibold text-zinc-200 text-left truncate nickname-display opacity-0 transition-opacity duration-300';
+                    nicknameEl.style.lineHeight = '1.2';
+                    rowWrapper.appendChild(tileContainer);
+                    rowWrapper.appendChild(nicknameEl);
+                    gameBoard.appendChild(rowWrapper);
+                }
+            }
+
+            function updateBoard(guesses) {
+                currentGuesses = guesses;
+                const reversedGuesses = [...guesses].reverse();
+                const rows = gameBoard.querySelectorAll('.flex.items-center');
+                rows.forEach((rowWrapper, rowIndex) => {
+                    const tileContainer = rowWrapper.querySelector('.grid.grid-cols-5');
+                    const nicknameEl = rowWrapper.querySelector('.nickname-display');
+                    const tiles = tileContainer.querySelectorAll('.tile');
+                    const guessData = reversedGuesses[rowIndex];
+                    if (guessData) {
+                        nicknameEl.textContent = guessData.nickname || guessData.username;
+                        nicknameEl.classList.remove('opacity-0');
+                        tiles.forEach((tile, tileIndex) => {
+                            const letterData = guessData.result[tileIndex];
+                            tile.textContent = letterData.letter;
+                            setTimeout(() => {
+                                tile.classList.add('tile-flip');
+                                const statusColor = { green: 'bg-green-600 border-green-600', yellow: 'bg-amber-500 border-amber-500', gray: 'bg-zinc-700 border-zinc-700' }[letterData.status] || 'bg-transparent';
+                                tile.className = `tile w-full aspect-square rounded-md ${statusColor}`;
+                                tile.textContent = letterData.letter;
+                            }, tileIndex * 100);
+                        });
+                    } else {
+                        nicknameEl.textContent = '';
+                        nicknameEl.classList.add('opacity-0');
+                        tiles.forEach(tile => {
+                            tile.textContent = '';
+                            tile.className = 'tile w-full aspect-square rounded-md';
+                        });
+                    }
+                });
+            }
+            
+            function updateTimer(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }
+            
+            function updateBestGuess(bestGuess) {
+                bestGuessDisplay.innerHTML = '';
+                if (bestGuess && bestGuess.result) {
+                    bestGuess.result.forEach(letterData => {
+                        const tile = document.createElement('div');
+                        const statusColor = { green: 'bg-green-600 border-green-600', yellow: 'bg-amber-500 border-amber-500', gray: 'bg-zinc-700 border-zinc-700' }[letterData.status] || 'bg-transparent border-zinc-700';
+                        tile.className = `w-full h-full rounded-md flex items-center justify-center text-xl font-bold uppercase ${statusColor}`;
+                        tile.textContent = letterData.letter;
+                        bestGuessDisplay.appendChild(tile);
+                    });
+                    bestGuessUserEl.textContent = `OLEH ${bestGuess.nickname || bestGuess.username}`;
+                } else {
+                    for (let i = 0; i < 5; i++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'w-full h-full rounded-md border-2 border-zinc-700';
+                        bestGuessDisplay.appendChild(tile);
+                    }
+                    bestGuessUserEl.textContent = 'TEBAKAN TERBAIK';
+                }
+            }
+            
+            function showToast(message) {
+                while (toastContainer.firstChild) { toastContainer.removeChild(toastContainer.firstChild); }
+                const toast = document.createElement('div');
+                toast.className = 'bg-zinc-700 text-white text-sm py-2 px-4 rounded-lg shadow-md toast-animation max-w-full truncate';
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                setTimeout(() => { if(toast.parentElement) { toast.parentElement.removeChild(toast); } }, 5000);
+            }
+
+            function showAnswer(word, meaning, isWinner = false, nickname = '', winCount = 0) {
+                clearInterval(nextGameInterval);
+                if (isWinner) {
+                    modalTitleEl.textContent = "Selamat!";
+                    winnerNicknameEl.textContent = nickname;
+                    winnerWinCountEl.textContent = winCount;
+                    winnerInfoEl.classList.remove('hidden');
+                } else {
+                    modalTitleEl.textContent = "Waktu Habis!";
+                    winnerInfoEl.classList.add('hidden');
+                }
+                correctWordEl.textContent = word;
+                wordMeaningEl.textContent = meaning;
+                answerModal.classList.remove('hidden');
+                setTimeout(() => answerModalContent.classList.remove('scale-95', 'opacity-0'), 10);
+                let countdown = 15;
+                const nextGameTimerEl = document.getElementById('next-game-timer');
+                nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-white">${countdown}</span> detik...`;
+                nextGameInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        nextGameTimerEl.innerHTML = `Game baru dimulai dalam <span class="font-bold text-white">${countdown}</span> detik...`;
+                    } else {
+                        clearInterval(nextGameInterval);
+                        nextGameTimerEl.textContent = 'Memulai game baru...';
+                    }
+                }, 1000);
+            }
+
+            function hideAnswer() {
+                 clearInterval(nextGameInterval);
+                 answerModalContent.classList.add('scale-95', 'opacity-0');
+                 setTimeout(() => answerModal.classList.add('hidden'), 300);
+            }
+            
+            function showWinCountModal(nickname, winCount) {
+                clearTimeout(winCountTimeout);
+                winCountNicknameEl.textContent = nickname;
+                winCountNumberEl.textContent = winCount;
+                winCountModal.classList.remove('hidden');
+                setTimeout(() => winCountModal.classList.remove('opacity-0', 'scale-95'), 10);
+                winCountTimeout = setTimeout(() => {
+                    winCountModal.classList.add('opacity-0', 'scale-95');
+                    setTimeout(() => winCountModal.classList.add('hidden'), 300);
+                }, 7000);
+            }
+
+            function resetForNewGame() {
+                hideAnswer();
+                initializeUI();
+                updateTimer(600);
+                updateBestGuess(null);
+            }
 
             function connectWebSocket() {
                 const wsUrl = `wss://${BACKEND_HOST}`;
                 const ws = new WebSocket(wsUrl);
-
-                ws.onopen = () => console.log('WebSocket connected');
-                ws.onmessage = (event) => { /* ... logika tidak berubah ... */ };
-                ws.onclose = () => {
-                    console.log('WebSocket disconnected. Reconnecting...');
-                    setTimeout(connectWebSocket, 3000);
+                ws.onopen = () => showToast('Terhubung ke server game!');
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    switch (data.type) {
+                        case 'gameState':
+                            if (data.guesses.length < currentGuesses.length || (data.guesses.length === 0 && currentGuesses.length > 0)) {
+                                resetForNewGame();
+                            }
+                            updateBoard(data.guesses);
+                            updateTimer(data.timeLeft);
+                            updateBestGuess(data.bestGuess);
+                            break;
+                        case 'message': showToast(data.content); break;
+                        case 'answer': showAnswer(data.word, data.meaning, false); break;
+                        case 'winner': showAnswer(data.word, data.meaning, true, data.nickname, data.winCount); break;
+                        case 'showWinCount': showWinCountModal(data.nickname, data.winCount); break;
+                    }
                 };
-                ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    ws.close();
-                };
+                ws.onclose = () => setTimeout(connectWebSocket, 3000);
+                ws.onerror = (error) => { console.error('WebSocket error:', error); ws.close(); };
             }
             
             function initializeGame() {
@@ -93,8 +259,6 @@
                         updateBestGuess(data.bestGuess || null);
                     });
             }
-
-            // Langsung mulai game saat halaman dimuat
             initializeGame();
         });
     </script>
