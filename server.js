@@ -15,7 +15,7 @@ const server = createServer(app);
 const wss = new WebSocket.WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const tiktokUsername = '@achmadsyams'; // Ganti dengan username yang akan LIVE
+const tiktokUsername = '@achmadsyams'; // Username TikTok untuk game KATLA
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
@@ -54,7 +54,7 @@ let guesses = [];
 let currentRow = 0;
 let timeLeft = 600;
 let timerInterval;
-let leaderboard = {};
+let leaderboard = {}; // Struktur baru: { userId: { nickname, score, profilePictureUrl } }
 let bestGuess = null;
 
 // Endpoints
@@ -97,7 +97,6 @@ function broadcastMessage(message) { broadcast({ type: 'message', content: messa
 function broadcastAnswer(word, meaning) { broadcast({ type: 'answer', word, meaning }); }
 function broadcastWinner(word, meaning, nickname, winCount) { broadcast({ type: 'winner', word, meaning, nickname, winCount }); }
 function broadcastWinCount(username, nickname, winCount) { broadcast({ type: 'showWinCount', username, nickname, winCount }); }
-// --- FUNGSI BARU UNTUK PAPAN SKOR ---
 function broadcastLeaderboard() { broadcast({ type: 'leaderboardUpdate', leaderboard }); }
 
 function startTimer() {
@@ -118,7 +117,7 @@ function startTimer() {
     }, 1000);
 }
 
-async function processGuess(word, username, nickname) {
+async function processGuess(word, username, nickname, profilePictureUrl) {
     if (timeLeft <= 0 || !targetWord) return;
 
     const { valid, meaning } = validateWord(word);
@@ -133,7 +132,8 @@ async function processGuess(word, username, nickname) {
         else if (targetWord.includes(word[i])) guessResult.push({ letter: word[i], status: 'yellow' });
         else guessResult.push({ letter: word[i], status: 'gray' });
     }
-    const guess = { word, result: guessResult, username, nickname };
+    // Tambahkan profilePictureUrl ke data tebakan
+    const guess = { word, result: guessResult, username, nickname, profilePictureUrl };
     guesses.push(guess);
     currentRow++;
 
@@ -144,11 +144,16 @@ async function processGuess(word, username, nickname) {
     broadcastGameState();
 
     if (word === targetWord) {
-        // Gunakan NICKNAME untuk papan skor agar konsisten
-        leaderboard[nickname] = (leaderboard[nickname] || 0) + 1;
-        broadcastWinner(word, meaning, nickname, leaderboard[nickname]);
+        // Gunakan USERNAME (uniqueId) sebagai key di leaderboard
+        if (!leaderboard[username]) {
+            leaderboard[username] = { nickname: nickname, score: 0, profilePictureUrl: profilePictureUrl };
+        }
         
-        // --- KIRIM PEMBARUAN PAPAN SKOR ---
+        leaderboard[username].score += 1;
+        leaderboard[username].nickname = nickname;
+        leaderboard[username].profilePictureUrl = profilePictureUrl;
+        
+        broadcastWinner(word, meaning, nickname, leaderboard[username].score);
         broadcastLeaderboard();
 
         timeLeft = 0;
@@ -175,15 +180,18 @@ tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     const rawComment = data.comment.trim().toLowerCase();
     const username = data.user.uniqueId;
     const nickname = data.user.nickname || username;
+    // Ambil URL foto profil
+    const profilePictureUrl = data.user.profilePictureUrl;
 
     if (rawComment === '!win') {
-        const winCount = leaderboard[nickname] || 0; // Cek win berdasarkan nickname
-        broadcastWinCount(username, nickname, winCount);
+        const playerData = leaderboard[username] || { score: 0 };
+        broadcastWinCount(username, nickname, playerData.score);
         return;
     }
 
     const comment = rawComment.replace(/[^a-z]/g, '').slice(0, 5);
-    if (comment.length === 5) await processGuess(comment, username, nickname);
+    // Kirim URL foto profil untuk diproses
+    if (comment.length === 5) await processGuess(comment, username, nickname, profilePictureUrl);
 });
 
 tiktokConnection.on('error', (err) => console.error('TikTok connection error:', JSON.stringify(err, null, 2)));

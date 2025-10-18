@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
-    <title>Ahmad Wordle - TikTok Live Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KATLA - TikTok Live Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,7 +43,7 @@
         <div id="app" class="w-full flex-grow flex flex-col gap-4 order-1 sm:order-2">
             <!-- Header -->
             <header class="text-center">
-                <h1 class="text-4xl font-black tracking-tighter text-slate-800">AHMAD WORDLE</h1>
+                <h1 class="text-4xl font-black tracking-tighter text-slate-800">KATLA</h1>
                 <p class="text-slate-400 flex items-center justify-center gap-2 text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-tiktok" viewBox="0 0 16 16"><path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3> 0 1 0 3 3V0Z"/></svg>
                     <span>LIVE TIKTOK GAME</span>
@@ -104,9 +104,9 @@
 
             const ROWS = 6;
             const COLS = 5;
-            let currentGuesses = [];
             let nextGameInterval;
             let winCountTimeout;
+            let gameHasEnded = false;
 
             function initializeUI() {
                 gameBoard.innerHTML = '';
@@ -120,44 +120,57 @@
                         tile.className = 'tile w-full aspect-square rounded-md bg-white';
                         tileContainer.appendChild(tile);
                     }
+                    // Wrapper untuk foto profil dan nama
+                    const userWrapper = document.createElement('div');
+                    userWrapper.className = 'w-24 flex items-center gap-1.5 opacity-0 transition-opacity duration-300';
+                    
+                    const imgEl = document.createElement('img');
+                    imgEl.className = 'w-5 h-5 rounded-full bg-slate-200 object-cover flex-shrink-0';
+                    imgEl.onerror = function() { this.style.display = 'none'; }; // Sembunyikan jika gambar gagal dimuat
+                    
                     const nicknameEl = document.createElement('div');
-                    nicknameEl.className = 'w-24 text-sm font-medium text-slate-500 text-left break-words nickname-display opacity-0 transition-opacity duration-300';
+                    nicknameEl.className = 'text-sm font-medium text-slate-500 text-left break-words';
                     nicknameEl.style.lineHeight = '1.2';
+
+                    userWrapper.appendChild(imgEl);
+                    userWrapper.appendChild(nicknameEl);
                     rowWrapper.appendChild(tileContainer);
-                    rowWrapper.appendChild(nicknameEl);
+                    rowWrapper.appendChild(userWrapper);
                     gameBoard.appendChild(rowWrapper);
                 }
             }
 
             function updateBoard(guesses) {
-                currentGuesses = guesses;
                 const reversedGuesses = [...guesses].reverse();
                 const rows = gameBoard.querySelectorAll('.flex.items-center');
                 rows.forEach((rowWrapper, rowIndex) => {
                     const tileContainer = rowWrapper.querySelector('.grid.grid-cols-5');
-                    const nicknameEl = rowWrapper.querySelector('.nickname-display');
+                    const userWrapper = rowWrapper.querySelector('.flex.items-center.gap-1\\.5');
+                    const imgEl = userWrapper.querySelector('img');
+                    const nicknameEl = userWrapper.querySelector('div');
                     const tiles = tileContainer.querySelectorAll('.tile');
                     const guessData = reversedGuesses[rowIndex];
+
                     if (guessData) {
+                        userWrapper.classList.remove('opacity-0');
+                        imgEl.src = guessData.profilePictureUrl;
+                        imgEl.style.display = 'block';
                         nicknameEl.textContent = guessData.nickname || guessData.username;
-                        nicknameEl.classList.remove('opacity-0');
+                        
                         tiles.forEach((tile, tileIndex) => {
                             const letterData = guessData.result[tileIndex];
                             tile.textContent = letterData.letter;
+                            
                             setTimeout(() => {
+                                tile.classList.remove('bg-white');
+                                if (letterData.status === 'green') tile.classList.add('bg-green-500', 'border-green-500', 'text-white');
+                                else if (letterData.status === 'yellow') tile.classList.add('bg-amber-500', 'border-amber-500', 'text-white');
+                                else if (letterData.status === 'gray') tile.classList.add('bg-slate-400', 'border-slate-400', 'text-white');
                                 tile.classList.add('tile-flip');
-                                const statusColor = { 
-                                    green: 'bg-green-500 border-green-500 text-white', 
-                                    yellow: 'bg-amber-500 border-amber-500 text-white', 
-                                    gray: 'bg-slate-400 border-slate-400 text-white' 
-                                }[letterData.status] || 'bg-white';
-                                tile.className = `tile w-full aspect-square rounded-md ${statusColor}`;
-                                tile.textContent = letterData.letter;
                             }, tileIndex * 100);
                         });
                     } else {
-                        nicknameEl.textContent = '';
-                        nicknameEl.classList.add('opacity-0');
+                        userWrapper.classList.add('opacity-0');
                         tiles.forEach(tile => {
                             tile.textContent = '';
                             tile.className = 'tile w-full aspect-square rounded-md bg-white';
@@ -168,19 +181,19 @@
             
             function updateLeaderboard(leaderboardData) {
                 leaderboardList.innerHTML = '';
-
                 if (!leaderboardData || Object.keys(leaderboardData).length === 0) {
                     leaderboardList.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Belum ada pemenang.</p>';
                     return;
                 }
 
-                const sortedPlayers = Object.entries(leaderboardData)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 10); // Menampilkan 10 teratas
+                // Ubah objek menjadi array dan urutkan
+                const sortedPlayers = Object.values(leaderboardData)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 10);
 
-                sortedPlayers.forEach(([username, score], index) => {
+                sortedPlayers.forEach((player, index) => {
                     const playerEl = document.createElement('div');
-                    playerEl.className = 'flex items-center justify-between text-sm p-1.5 rounded-md ' + (index < 3 ? 'bg-amber-100' : '');
+                    playerEl.className = 'flex items-center justify-between text-sm p-1.5 rounded-md ' + (index < 3 ? 'bg-amber-200' : '');
                     
                     const rankAndName = document.createElement('div');
                     rankAndName.className = 'flex items-center gap-2 overflow-hidden';
@@ -188,17 +201,24 @@
                     const rank = document.createElement('span');
                     rank.className = 'font-bold w-5 text-slate-400 text-right flex-shrink-0';
                     rank.textContent = `${index + 1}.`;
+
+                    // Tambahkan foto profil di leaderboard
+                    const img = document.createElement('img');
+                    img.src = player.profilePictureUrl;
+                    img.className = 'w-5 h-5 rounded-full object-cover flex-shrink-0';
+                    img.onerror = function() { this.style.display = 'none'; };
                     
                     const name = document.createElement('span');
                     name.className = 'font-medium text-slate-700 truncate';
-                    name.textContent = username;
+                    name.textContent = player.nickname; // Tampilkan nickname
                     
                     rankAndName.appendChild(rank);
+                    rankAndName.appendChild(img);
                     rankAndName.appendChild(name);
                     
                     const scoreEl = document.createElement('span');
                     scoreEl.className = 'font-bold text-slate-800 flex-shrink-0';
-                    scoreEl.textContent = score;
+                    scoreEl.textContent = player.score;
 
                     playerEl.appendChild(rankAndName);
                     playerEl.appendChild(scoreEl);
@@ -247,6 +267,7 @@
             }
 
             function showAnswer(word, meaning, isWinner = false, nickname = '', winCount = 0) {
+                gameHasEnded = true;
                 clearInterval(nextGameInterval);
                 if (isWinner) {
                     modalTitleEl.textContent = "Selamat!";
@@ -308,8 +329,9 @@
                     const data = JSON.parse(event.data);
                     switch (data.type) {
                         case 'gameState':
-                            if (data.guesses.length < currentGuesses.length || (data.guesses.length === 0 && currentGuesses.length > 0)) {
+                            if (gameHasEnded) {
                                 resetForNewGame();
+                                gameHasEnded = false;
                             }
                             updateBoard(data.guesses);
                             updateTimer(data.timeLeft);
