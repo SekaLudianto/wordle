@@ -83,7 +83,14 @@ app.post('/api/connect-tiktok', async (req, res) => {
     const tiktokConnection = new TikTokLiveConnection(username, {
         processInitialData: false,
         fetchRoomInfoOnConnect: true,
-        enableLog: true
+        enableLog: true,
+        clientParams: {
+            "app_language": "id-ID", // Menggunakan bahasa Indonesia
+            "device_platform": "web"
+        },
+        requestHeaders: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"
+        }
     });
 
     tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
