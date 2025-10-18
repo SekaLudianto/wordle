@@ -145,6 +145,10 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // --- URL BACKEND ANDA DARI RENDER.COM ---
+            // Ganti URL di bawah ini dengan URL backend Anda yang didapat dari Render.
+            const BACKEND_HOST = 'ahmad-wordle.onrender.com'; // <-- GANTI INI
+
             const gameBoard = document.getElementById('game-board');
             const timerEl = document.getElementById('timer');
             const bestGuessDisplay = document.getElementById('best-guess-display');
@@ -360,8 +364,7 @@
             }
 
             function connectWebSocket() {
-                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${wsProtocol}//${window.location.host}`;
+                const wsUrl = `wss://${BACKEND_HOST}`;
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
@@ -410,7 +413,7 @@
             initializeUI();
             connectWebSocket();
             
-            fetch('/api/game-state')
+            fetch(`https://${BACKEND_HOST}/api/game-state`)
                 .then(res => res.json())
                 .then(data => {
                     updateBoard(data.guesses || []);
