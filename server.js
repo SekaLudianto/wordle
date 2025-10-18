@@ -15,7 +15,7 @@ const server = createServer(app);
 const wss = new WebSocket.WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const tiktokUsername = '@bro.mobaa'; // Ganti dengan username yang akan LIVE
+const tiktokUsername = '@achmadsyams'; // Ganti dengan username yang akan LIVE
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
