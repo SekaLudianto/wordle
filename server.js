@@ -82,7 +82,8 @@ app.post('/api/connect-tiktok', async (req, res) => {
     
     const tiktokConnection = new TikTokLiveConnection(username, {
         processInitialData: false,
-        fetchRoomInfoOnConnect: true
+        fetchRoomInfoOnConnect: true,
+        enableLog: true
     });
 
     tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
