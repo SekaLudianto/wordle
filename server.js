@@ -15,7 +15,7 @@ const server = createServer(app);
 const wss = new WebSocket.WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const tiktokUsername = '@achmadsyams'; // Ganti dengan username yang akan LIVE
+const tiktokUsername = '@bro.mobaa'; // Ganti dengan username yang akan LIVE
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
@@ -49,11 +49,10 @@ const fiveLetterWords = kbbiData.filter(word => {
 });
 console.log(`5-letter words: ${fiveLetterWords.length}`);
 
-// State permainan
 let targetWord = '';
 let guesses = [];
 let currentRow = 0;
-let timeLeft = 600; // 10 menit
+let timeLeft = 600;
 let timerInterval;
 let leaderboard = {};
 let bestGuess = null;
@@ -63,27 +62,14 @@ app.get('/api/new-game', (req, res) => {
     startNewGame();
     res.json({ status: 'New game started' });
 });
+app.get('/api/game-state', (req, res) => res.json({ guesses, currentRow, timeLeft, targetWord, bestGuess }));
+app.get('/api/leaderboard', (req, res) => res.json(leaderboard));
 
-app.get('/api/game-state', (req, res) => {
-    res.json({ guesses, currentRow, timeLeft, targetWord, bestGuess });
-});
-
-app.get('/api/leaderboard', (req, res) => {
-    res.json(leaderboard);
-});
-
-
-// --- FUNGSI VALIDASI BARU ---
 function validateWord(word) {
-    if (!/^[a-z]{5}$/.test(word)) {
-        return { valid: false, meaning: 'Kata harus 5 huruf (hanya a-z)' };
-    }
+    if (!/^[a-z]{5}$/.test(word)) return { valid: false, meaning: 'Kata harus 5 huruf (hanya a-z)' };
     const entry = kbbiMap.get(word.toLowerCase());
-    if (entry) {
-        return { valid: true, meaning: `${entry.makna} (${entry.contoh || 'Tanpa contoh'})` };
-    } else {
-        return { valid: false, meaning: 'Kata tidak ditemukan di KBBI' };
-    }
+    if (entry) return { valid: true, meaning: `${entry.makna} (${entry.contoh || 'Tanpa contoh'})` };
+    return { valid: false, meaning: 'Kata tidak ditemukan di KBBI' };
 }
 
 function startNewGame() {
@@ -98,43 +84,21 @@ function startNewGame() {
     broadcastGameState();
 }
 
-// --- FUNGSI BROADCAST DIPERBAIKI ---
-function broadcastGameState() {
+// Fungsi broadcast
+function broadcast(data) {
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'gameState', guesses, currentRow, timeLeft, bestGuess }));
+            client.send(JSON.stringify(data));
         }
     });
 }
-function broadcastMessage(message) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'message', content: message }));
-        }
-    });
-}
-function broadcastAnswer(word, meaning) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'answer', word, meaning }));
-        }
-    });
-}
-function broadcastWinner(word, meaning, nickname, winCount) {
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'winner', word, meaning, nickname, winCount }));
-        }
-    });
-}
-function broadcastWinCount(username, nickname, winCount) {
-     wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'showWinCount', username, nickname, winCount }));
-        }
-    });
-}
-
+function broadcastGameState() { broadcast({ type: 'gameState', guesses, currentRow, timeLeft, bestGuess }); }
+function broadcastMessage(message) { broadcast({ type: 'message', content: message }); }
+function broadcastAnswer(word, meaning) { broadcast({ type: 'answer', word, meaning }); }
+function broadcastWinner(word, meaning, nickname, winCount) { broadcast({ type: 'winner', word, meaning, nickname, winCount }); }
+function broadcastWinCount(username, nickname, winCount) { broadcast({ type: 'showWinCount', username, nickname, winCount }); }
+// --- FUNGSI BARU UNTUK PAPAN SKOR ---
+function broadcastLeaderboard() { broadcast({ type: 'leaderboardUpdate', leaderboard }); }
 
 function startTimer() {
     clearInterval(timerInterval);
@@ -154,54 +118,45 @@ function startTimer() {
     }, 1000);
 }
 
-// --- FUNGSI PROCESSGUESS DIPERBAIKI ---
 async function processGuess(word, username, nickname) {
-    if (timeLeft <= 0 || !targetWord) {
-        broadcastMessage('Waktu habis atau game belum dimulai!');
-        return;
-    }
+    if (timeLeft <= 0 || !targetWord) return;
 
-    // Panggil fungsi validasi secara langsung, bukan via fetch
     const { valid, meaning } = validateWord(word);
-
     if (!valid) {
-        broadcastMessage(`${nickname}: "${word}" tidak valid di KBBI.`);
+        broadcastMessage(`${nickname}: "${word}" tidak valid.`);
         return;
     }
 
     const guessResult = [];
     for (let i = 0; i < 5; i++) {
-        if (word[i] === targetWord[i]) {
-            guessResult.push({ letter: word[i], status: 'green' });
-        } else if (targetWord.includes(word[i])) {
-            guessResult.push({ letter: word[i], status: 'yellow' });
-        } else {
-            guessResult.push({ letter: word[i], status: 'gray' });
-        }
+        if (word[i] === targetWord[i]) guessResult.push({ letter: word[i], status: 'green' });
+        else if (targetWord.includes(word[i])) guessResult.push({ letter: word[i], status: 'yellow' });
+        else guessResult.push({ letter: word[i], status: 'gray' });
     }
     const guess = { word, result: guessResult, username, nickname };
     guesses.push(guess);
     currentRow++;
 
-    // Update tebakan terbaik
     const score = guess.result.filter(r => r.status === 'green').length * 2 + guess.result.filter(r => r.status === 'yellow').length;
     const bestScore = bestGuess ? bestGuess.result.filter(r => r.status === 'green').length * 2 + bestGuess.result.filter(r => r.status === 'yellow').length : 0;
-    if (!bestGuess || score > bestScore) {
-        bestGuess = guess;
-    }
+    if (!bestGuess || score > bestScore) bestGuess = guess;
 
     broadcastGameState();
 
     if (word === targetWord) {
-        leaderboard[username] = (leaderboard[username] || 0) + 1;
-        broadcastWinner(word, meaning, nickname, leaderboard[username]);
+        // Gunakan NICKNAME untuk papan skor agar konsisten
+        leaderboard[nickname] = (leaderboard[nickname] || 0) + 1;
+        broadcastWinner(word, meaning, nickname, leaderboard[nickname]);
+        
+        // --- KIRIM PEMBARUAN PAPAN SKOR ---
+        broadcastLeaderboard();
+
         timeLeft = 0;
         clearInterval(timerInterval);
         targetWord = '';
         setTimeout(startNewGame, 15000);
     }
 }
-
 
 // Koneksi Otomatis TikTok
 const tiktokConnection = new TikTokLiveConnection(tiktokUsername, {
@@ -212,11 +167,9 @@ const tiktokConnection = new TikTokLiveConnection(tiktokUsername, {
 
 tiktokConnection.connect().then(state => {
     console.info(`Connected to TikTok LIVE: ${state.roomId}`);
-    broadcastMessage(`Terhubung ke LIVE ${tiktokUsername}! Permainan dimulai.`);
+    broadcastMessage(`Terhubung ke LIVE ${tiktokUsername}!`);
     startNewGame();
-}).catch(err => {
-    console.error('Failed to connect to TikTok LIVE:', err.message);
-});
+}).catch(err => console.error('Failed to connect to TikTok LIVE:', err.message));
 
 tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     const rawComment = data.comment.trim().toLowerCase();
@@ -224,15 +177,13 @@ tiktokConnection.on(WebcastEvent.CHAT, async (data) => {
     const nickname = data.user.nickname || username;
 
     if (rawComment === '!win') {
-        const winCount = leaderboard[username] || 0;
+        const winCount = leaderboard[nickname] || 0; // Cek win berdasarkan nickname
         broadcastWinCount(username, nickname, winCount);
         return;
     }
 
     const comment = rawComment.replace(/[^a-z]/g, '').slice(0, 5);
-    if (comment.length === 5) {
-        await processGuess(comment, username, nickname);
-    }
+    if (comment.length === 5) await processGuess(comment, username, nickname);
 });
 
 tiktokConnection.on('error', (err) => console.error('TikTok connection error:', JSON.stringify(err, null, 2)));
